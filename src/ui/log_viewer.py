@@ -11,11 +11,11 @@ class LogViewer(QGroupBox):
         self.settings_manager = SettingsManager()
         self.log_entries = []
         
-        # Carica le impostazioni dei filtri salvate
+        # Load saved filter settings
         ui_state = self.settings_manager.get_ui_state()
         log_filters = ui_state.get('log_filters', {})
         
-        # Default impostazioni di filtraggio
+        # Default filter settings
         self.show_info = log_filters.get('show_info', True)
         self.show_warning = log_filters.get('show_warning', True)
         self.show_error = log_filters.get('show_error', True)
@@ -79,16 +79,16 @@ class LogViewer(QGroupBox):
         
         layout.addWidget(filter_container)
         
-        # Configura l'area di log con stile moderno
+        # Configure the log area with modern style
         self.log_text = QPlainTextEdit()
         self.log_text.setReadOnly(True)
         
-        # Imposta il font monospace per una migliore leggibilità dei log
+        # Set monospace font for better log readability
         font = QFont("Consolas" if hasattr(QFont, "Consolas") else "Courier")
         font.setPointSize(9)
         self.log_text.setFont(font)
         
-        # Definisci i formati per i diversi tipi di log
+        # Define formats for different log types
         self.formats = {
             "INFO": QTextCharFormat(),
             "WARNING": QTextCharFormat(),
@@ -97,29 +97,29 @@ class LogViewer(QGroupBox):
             "FRAME": QTextCharFormat()
         }
         
-        # INFO: colore standard
+        # INFO: standard color
         self.formats["INFO"].setForeground(QBrush(QColor("#e0e0e0")))
         
-        # WARNING: giallo
+        # WARNING: yellow
         self.formats["WARNING"].setForeground(QBrush(QColor("#ffd700")))
         
-        # ERROR: rosso
+        # ERROR: red
         self.formats["ERROR"].setForeground(QBrush(QColor("#ff6b6b")))
         
-        # SUCCESS: verde
+        # SUCCESS: green
         self.formats["SUCCESS"].setForeground(QBrush(QColor("#69db7c")))
         
-        # FRAME: azzurro (per info sui frame)
+        # FRAME: light blue (for frame info)
         self.formats["FRAME"].setForeground(QBrush(QColor("#eb5e28")))
         
         layout.addWidget(self.log_text)
         self.setLayout(layout)
         
-        # Imposta lo stato iniziale dei filtri
+        # Set initial filter state
         self.filter_changed()
     
     def append_log(self, message, level="INFO"):
-        """Aggiunge un messaggio al log con il formato appropriato"""
+        """Adds a message to the log with the appropriate format"""
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
         log_entry = {"timestamp": timestamp, "message": message, "level": level}
         self.log_entries.append(log_entry)
@@ -128,26 +128,26 @@ class LogViewer(QGroupBox):
             cursor = self.log_text.textCursor()
             cursor.movePosition(cursor.End)
             
-            # Seleziona il formato appropriato
+            # Select the appropriate format
             format = self.formats.get(level, self.formats["INFO"])
             
-            # Aggiungi timestamp e livello
+            # Add timestamp and level
             cursor.insertText(f"[{timestamp}] [{level}] ", format)
             cursor.insertText(f"{message}\n", format)
             
-            # Scorri automaticamente verso il basso
+            # Automatically scroll down
             self.log_text.setTextCursor(cursor)
             self.log_text.ensureCursorVisible()
     
     def should_show_message(self, message, level):
-        """Determina se un messaggio deve essere mostrato in base ai filtri attuali"""
-        # Controlla il livello
+        """Determines if a message should be shown based on current filters"""
+        # Check the level
         if ((level == "INFO" and not self.show_info) or 
             (level == "WARNING" and not self.show_warning) or 
             (level == "ERROR" and not self.show_error)):
             return False
         
-        # Controlla il livello di dettaglio
+        # Check the detail level
         detail_level = self.detail_combo.currentIndex()
         if detail_level == 2:  # Minimal
             return self.is_important_message(message, level)
@@ -157,7 +157,7 @@ class LogViewer(QGroupBox):
         return True  # All
     
     def is_important_message(self, message, level):
-        """Determina se un messaggio è importante"""
+        """Determines if a message is important"""
         if level in ["ERROR", "WARNING"]:
             return True
         
@@ -169,7 +169,7 @@ class LogViewer(QGroupBox):
         return any(pattern in message for pattern in important_patterns)
     
     def is_technical_message(self, message):
-        """Determina se un messaggio è troppo tecnico o di debug"""
+        """Determines if a message is too technical or debug"""
         technical_patterns = [
             "malloc", "Memory:", "AL lib:", "pure-virtual:", 
             "OpenGL", "libGL", "0x", "libpng", "libjpeg"
@@ -178,12 +178,12 @@ class LogViewer(QGroupBox):
         return any(pattern in message for pattern in technical_patterns)
     
     def filter_changed(self):
-        """Gestisce il cambio di stato dei filtri"""
+        """Handles filter state changes"""
         self.show_info = self.info_checkbox.isChecked()
         self.show_warning = self.warning_checkbox.isChecked()
         self.show_error = self.error_checkbox.isChecked()
         
-        # Salva lo stato dei filtri
+        # Save filter state
         ui_state = self.settings_manager.get_ui_state()
         ui_state['log_filters'] = {
             'show_info': self.show_info,
@@ -193,11 +193,11 @@ class LogViewer(QGroupBox):
         }
         self.settings_manager.set_ui_state(ui_state)
         
-        # Riapplica i filtri
+        # Reapply filters
         self.apply_filters()
     
     def apply_filters(self):
-        """Riapplica i filtri a tutti i messaggi di log"""
+        """Reapplies filters to all log messages"""
         self.log_text.clear()
         for entry in self.log_entries:
             if self.should_show_message(entry["message"], entry["level"]):
@@ -209,7 +209,7 @@ class LogViewer(QGroupBox):
                 cursor.insertText(f"{entry['message']}\n", format)
     
     def process_blender_output(self, output_line):
-        """Processa una linea di output da Blender e la formatta appropriatamente"""
+        """Processes a line of output from Blender and formats it appropriately"""
         if "Saved:" in output_line:
             self.append_log(output_line, "SUCCESS")
         elif "Fra:" in output_line:
@@ -222,6 +222,6 @@ class LogViewer(QGroupBox):
             self.append_log(output_line, "INFO")
     
     def clear(self):
-        """Pulisce il log"""
+        """Clears the log"""
         self.log_entries.clear()
         self.log_text.clear()

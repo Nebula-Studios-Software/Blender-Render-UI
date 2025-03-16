@@ -1,13 +1,14 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                          QLineEdit, QPushButton, QFileDialog, QCheckBox, 
                          QComboBox, QSpinBox, QTabWidget, QScrollArea, 
-                         QGroupBox, QFormLayout, QApplication, QFrame)
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIcon, QFont
+                         QGroupBox, QFormLayout, QApplication, QFrame, QInputDialog, QDialog)
+from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtGui import QIcon
 import os
 import sys
 from ..core.param_definitions import ParamDefinitions
 from ..utils.settings_manager import SettingsManager
+from .preset_manager import PresetManagerDialog
 
 class CommandBuilder(QWidget):
     def __init__(self, parent=None):
@@ -69,8 +70,8 @@ class CommandBuilder(QWidget):
             }
             QTabBar::tab:selected {
                 background: #1e1e1e;
-                color: #00b4d8;
-                border-right: 2px solid #00b4d8;
+                color: #eb5e28;
+                border-right: 2px solid #eb5e28;
             }
             QTabBar::tab:hover:!selected {
                 background: #2d2d2d;
@@ -80,13 +81,49 @@ class CommandBuilder(QWidget):
         # Ottiene le categorie di parametri
         param_categories = ParamDefinitions.get_categories()
         
-        # Tab per le impostazioni generali (Blender Path)
+        # Tab per le impostazioni generali (Blender Path e Preset)
         general_tab = QWidget()
         general_layout = QVBoxLayout(general_tab)
         general_layout.setContentsMargins(20, 20, 20, 20)
         general_layout.setSpacing(15)
         
-        # Blender Path Section con stile moderno
+        # Preset Section
+        preset_frame = QFrame()
+        preset_frame.setObjectName("presetFrame")
+        preset_frame.setStyleSheet("""
+            #presetFrame {
+                background-color: #252525;
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
+        preset_layout = QVBoxLayout(preset_frame)
+        preset_layout.setContentsMargins(15, 15, 15, 15)
+        preset_layout.setSpacing(10)
+        
+        preset_label = QLabel("Presets:")
+        preset_label.setStyleSheet("color: #eb5e28; font-weight: bold;")
+        
+        # Preset controls container
+        preset_controls = QHBoxLayout()
+        
+        self.preset_combo = QComboBox()
+        self.preset_combo.currentTextChanged.connect(self.on_preset_selected)
+        
+        save_preset_btn = QPushButton("Save as...")
+        save_preset_btn.clicked.connect(self.save_preset_dialog)
+        
+        manage_preset_btn = QPushButton("Manage")
+        manage_preset_btn.clicked.connect(self.show_preset_manager)
+        
+        preset_controls.addWidget(self.preset_combo, stretch=1)
+        preset_controls.addWidget(save_preset_btn)
+        preset_controls.addWidget(manage_preset_btn)
+        
+        preset_layout.addWidget(preset_label)
+        preset_layout.addLayout(preset_controls)
+        
+        # Blender Path Section
         path_frame = QFrame()
         path_frame.setObjectName("pathFrame")
         path_frame.setStyleSheet("""
@@ -101,7 +138,7 @@ class CommandBuilder(QWidget):
         path_layout.setSpacing(10)
         
         path_label = QLabel("Blender Path:")
-        path_label.setStyleSheet("color: #00b4d8; font-weight: bold;")
+        path_label.setStyleSheet("color: #eb5e28; font-weight: bold;")
         self.blender_path_edit = QLineEdit()
         
         browse_btn = QPushButton("Browse")
@@ -112,19 +149,19 @@ class CommandBuilder(QWidget):
         path_layout.addWidget(self.blender_path_edit)
         path_layout.addWidget(browse_btn)
         
+        general_layout.addWidget(preset_frame)
         general_layout.addWidget(path_frame)
         general_layout.addStretch()
         
         tabs.addTab(general_tab, "General")
-        
-        # Crea un tab per ogni categoria
+
+        # ...existing code for creating parameter tabs...
         for category_name, parameters in param_categories.items():
             tab = QWidget()
             tab_layout = QVBoxLayout()
             tab_layout.setContentsMargins(20, 20, 20, 20)
             tab_layout.setSpacing(15)
             
-            # ScrollArea con stile moderno
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
             scroll.setFrameShape(QFrame.NoFrame)
@@ -158,7 +195,6 @@ class CommandBuilder(QWidget):
             scroll_layout.setSpacing(15)
             scroll_layout.setContentsMargins(0, 0, 15, 0)
             
-            # Aggiunge i parametri per questa categoria
             for param in parameters:
                 self.add_parameter_widget(param, scroll_layout)
             
@@ -168,49 +204,14 @@ class CommandBuilder(QWidget):
             tab.setLayout(tab_layout)
             tabs.addTab(tab, category_name)
         
-        main_layout.addWidget(tabs, stretch=1)
-        
-        # Container per pulsanti
-        right_container = QFrame()
-        right_container.setObjectName("rightContainer")
-        right_container.setStyleSheet("""
-            #rightContainer {
-                background-color: #252525;
-                border-left: 1px solid #333333;
-            }
-        """)
-        right_layout = QVBoxLayout(right_container)
-        right_layout.setContentsMargins(20, 20, 20, 20)
-        right_layout.setSpacing(15)
-        
-        # Buttons container
-        buttons_container = QFrame()
-        buttons_layout = QHBoxLayout(buttons_container)
-        buttons_layout.setContentsMargins(0, 0, 0, 0)
-        buttons_layout.setSpacing(10)
-        
-        self.copy_button = QPushButton("Copy Command")
-        self.copy_button.setFixedWidth(150)
-        self.copy_button.clicked.connect(self.copy_command)
-        
-        self.reset_button = QPushButton("Reset")
-        self.reset_button.setFixedWidth(100)
-        self.reset_button.clicked.connect(self.reset_parameters)
-        
-        buttons_layout.addWidget(self.copy_button)
-        buttons_layout.addWidget(self.reset_button)
-        buttons_layout.addStretch()
-        
-        right_layout.addWidget(buttons_container)
-        right_layout.addStretch()
-        
-        main_layout.addWidget(right_container, stretch=0)
-        right_container.setFixedWidth(400)  # Larghezza fissa per il pannello destro
-        
+        main_layout.addWidget(tabs)
         self.setLayout(main_layout)
         
         # Aggiorna il comando iniziale
         self.update_command()
+
+        # Load presets
+        self.load_presets()
 
     def add_parameter_widget(self, param, layout):
         """Aggiunge un widget appropriato al tipo di parametro"""
@@ -234,7 +235,7 @@ class CommandBuilder(QWidget):
             line_edit = QLineEdit()
             line_edit.setPlaceholderText(param_description)
             
-            browse_button = QPushButton("Sfoglia...")
+            browse_button = QPushButton("Browse...")
             browse_button.clicked.connect(lambda _, le=line_edit, p=param["param"]: 
                                         self.browse_file(le, p))
             
@@ -253,7 +254,7 @@ class CommandBuilder(QWidget):
             line_edit = QLineEdit()
             line_edit.setPlaceholderText(param_description)
             
-            browse_button = QPushButton("Sfoglia...")
+            browse_button = QPushButton("Browse...")
             browse_button.clicked.connect(lambda _, le=line_edit, p=param["param"]: 
                                         self.browse_directory(le, p))
             
@@ -320,93 +321,91 @@ class CommandBuilder(QWidget):
             del self.parameter_values[param_name]
         elif value:
             self.parameter_values[param_name] = value
+        
+        # Aggiorna il comando
         self.update_command()
-        # Salva le impostazioni ogni volta che vengono modificate
+        
+        # Salva le impostazioni
         self.save_settings()
+        
+        # Se c'è un preset attivo, aggiornalo
+        current_preset = self.preset_combo.currentText()
+        if current_preset:
+            # Raccogli tutte le impostazioni correnti
+            current_settings = {
+                'name': current_preset,
+                'blender_path': self.blender_path_edit.text(),
+                'parameters': self.get_current_parameters()
+            }
+            # Salva nel preset corrente
+            self.settings_manager.save_as_preset(current_preset, current_settings)
 
     def update_command(self):
         """Aggiorna la visualizzazione del comando completo"""
         blender_path = self.blender_path_edit.text()
-        command_parts = [f'"{blender_path}"'] if blender_path else ["blender"]
+        command_parts = []
+        
+        # Aggiungi il percorso di Blender
+        if blender_path:
+            command_parts.append(f'"{blender_path}"')
+        else:
+            command_parts.append("blender")
         
         # Gestisci il file .blend separatamente
         blend_file = None
-        # Controlla se -b è attivo
         background_mode = False
         
         ordered_params = []
         
+        # Raccogli i parametri e gestisci -b e il file blend separatamente
         for param, value in self.parameter_values.items():
             if param == ParamDefinitions.FILE:
                 blend_file = value
-                continue
             elif param == ParamDefinitions.BACKGROUND and value:
                 background_mode = True
-            
-            # Ottieni l'ordine del parametro
-            order = ParamDefinitions.get_param_order(param)
-            ordered_params.append((order, param, value))
+            else:
+                order = ParamDefinitions.get_param_order(param)
+                ordered_params.append((order, param, value))
         
         # Ordina i parametri in base alla priorità
         ordered_params.sort(key=lambda x: x[0])
         
-        # Se abbiamo un file .blend, inseriscilo nella posizione corretta
-        if blend_file:
-            if background_mode:
-                # Cerca la posizione di -b nei parametri ordinati
-                b_index = -1
-                for i, (_, param, _) in enumerate(ordered_params):
-                    if param == ParamDefinitions.BACKGROUND:
-                        b_index = i
-                        break
-                
-                # Inserisci il file .blend dopo -b
-                if b_index >= 0:
-                    first_params = ordered_params[:b_index + 1]
-                    remaining_params = ordered_params[b_index + 1:]
-                    
-                    # Aggiungi i parametri fino a -b incluso
-                    for _, param, value in first_params:
-                        if isinstance(value, bool) and value:
-                            command_parts.append(param)
-                        elif not isinstance(value, bool) and value:
-                            command_parts.extend([param, f'"{value}"'])
-                    
-                    # Aggiungi il file .blend
-                    command_parts.extend([f'"{blend_file}"'])
-                    
-                    # Aggiungi i parametri rimanenti
-                    for _, param, value in remaining_params:
-                        if isinstance(value, bool) and value:
-                            command_parts.append(param)
-                        elif not isinstance(value, bool) and value:
-                            command_parts.extend([param, f'"{value}"'])
+        # Gestisci -b e file blend
+        if background_mode:
+            if blend_file:
+                command_parts.append(f'-b "{blend_file}"')
             else:
-                # Se non c'è -b, aggiungi il file subito dopo l'exe
-                command_parts.extend([f'"{blend_file}"'])
-                
-                # Poi aggiungi tutti gli altri parametri
-                for _, param, value in ordered_params:
-                    if isinstance(value, bool) and value:
-                        command_parts.append(param)
-                    elif not isinstance(value, bool) and value:
-                        command_parts.extend([param, f'"{value}"'])
-        else:
-            # Se non c'è file .blend, aggiungi tutti i parametri normalmente
-            for _, param, value in ordered_params:
-                if isinstance(value, bool) and value:
-                    command_parts.append(param)
-                elif not isinstance(value, bool) and value:
-                    command_parts.extend([param, f'"{value}"'])
+                command_parts.append("-b")
+        elif blend_file:
+            command_parts.append(f'"{blend_file}"')
         
+        # Aggiungi gli altri parametri
+        for _, param, value in ordered_params:
+            if isinstance(value, bool):
+                if value:
+                    command_parts.append(param)
+            else:
+                command_parts.append(f'{param} "{value}"')
+        
+        # Unisci le parti con uno spazio
         command = " ".join(command_parts)
         if hasattr(self, 'main_window') and self.main_window is not None:
             self.main_window.update_command_preview(command)
 
     def build_command(self):
-        """Build and return the command without showing preview"""
-        # Return the command for the main window to display
-        return self.construct_command()
+        """Build and return the command as a list"""
+        # Forza l'aggiornamento del comando
+        self.update_command()
+        
+        # Ottieni il comando dalla preview e splittalo in una lista
+        # preservando le parti tra virgolette
+        command_str = self.main_window.command_preview.text()
+        if not command_str:
+            return None
+            
+        # Split preservando le parti tra virgolette
+        import shlex
+        return shlex.split(command_str)
 
     def construct_command(self):
         """Internal method to construct the command"""
@@ -414,7 +413,7 @@ class CommandBuilder(QWidget):
         if not blender_path:
             return None
 
-        command = [blender_path, '-b']
+        command = [blender_path]
         # Add other parameters based on widget values
         for param_name, widget in self.parameter_widgets.items():
             value = None
@@ -426,15 +425,18 @@ class CommandBuilder(QWidget):
                 value = widget.value()
             elif isinstance(widget, QComboBox):
                 value = widget.currentText()
+            elif isinstance(widget, QWidget):
+                # Try to find a QLineEdit inside composite widgets
+                line_edit = widget.findChild(QLineEdit)
+                if line_edit:
+                    value = line_edit.text()
 
             if value:
-                param_def = ParamDefinitions.get_param(param_name)
-                if param_def:
-                    if isinstance(value, bool) and value:
-                        command.append(param_def)
-                    else:
-                        command.append(param_def)
-                        command.append(str(value))
+                # Add the parameter flag
+                command.append(param_name)
+                # Add the value only if it's not a boolean parameter
+                if not isinstance(value, bool):
+                    command.append(str(value))
 
         return command
 
@@ -505,3 +507,122 @@ class CommandBuilder(QWidget):
         
         # Salva i parametri
         self.settings_manager.set_parameters(parameters)
+
+    def load_presets(self):
+        """Carica i preset nel combo box"""
+        self.preset_combo.clear()
+        preset_names = self.settings_manager.get_preset_names()
+        self.preset_combo.addItems(preset_names)
+
+    def on_preset_selected(self, preset_name):
+        """Gestisce la selezione di un preset"""
+        if not preset_name:
+            return
+            
+        preset = self.settings_manager.get_preset(preset_name)
+        if preset:
+            # Applica le impostazioni del preset
+            if 'blender_path' in preset:
+                self.blender_path_edit.setText(preset['blender_path'])
+            
+            if 'parameters' in preset:
+                self.load_parameters(preset['parameters'])
+
+    def load_parameters(self, parameters):
+        """Carica i parametri nei widget corrispondenti"""
+        for param_name, value in parameters.items():
+            # Gestione speciale per il file .blend
+            if param_name == 'blend_file':
+                param_name = ParamDefinitions.FILE
+            
+            if param_name in self.parameter_widgets:
+                widget = self.parameter_widgets[param_name]
+                
+                # Aggiorna il widget
+                if isinstance(widget, QCheckBox):
+                    widget.setChecked(bool(value))
+                elif isinstance(widget, QSpinBox):
+                    widget.setValue(int(value))
+                elif isinstance(widget, QComboBox):
+                    index = widget.findText(str(value))
+                    if index >= 0:
+                        widget.setCurrentIndex(index)
+                elif isinstance(widget, QLineEdit):
+                    widget.setText(str(value))
+                elif isinstance(widget, QWidget):
+                    # Cerca QLineEdit all'interno di container compositi
+                    line_edit = widget.findChild(QLineEdit)
+                    if line_edit:
+                        line_edit.setText(str(value))
+                
+                # Aggiorna parameter_values
+                if value:
+                    if param_name == ParamDefinitions.FILE:
+                        self.parameter_values[param_name] = value
+                    else:
+                        self.parameter_values[param_name] = value
+
+    def save_preset_dialog(self):
+        """Mostra un dialog per salvare il preset corrente"""
+        name, ok = QInputDialog.getText(
+            self, 
+            "Save Preset",
+            "Enter preset name:",
+            QLineEdit.Normal,
+            ""
+        )
+        
+        if ok and name:
+            # Raccogli tutte le impostazioni correnti
+            current_settings = {
+                'name': name,
+                'blender_path': self.blender_path_edit.text(),
+                'parameters': self.get_current_parameters()
+            }
+            
+            # Salva il preset
+            self.settings_manager.save_as_preset(name, current_settings)
+            
+            # Aggiorna la lista dei preset
+            self.load_presets()
+            
+            # Seleziona il nuovo preset
+            index = self.preset_combo.findText(name)
+            if index >= 0:
+                self.preset_combo.setCurrentIndex(index)
+
+    def show_preset_manager(self):
+        """Mostra il dialog per gestire i preset"""
+        dialog = PresetManagerDialog(self.settings_manager, self)
+        if dialog.exec_() == QDialog.Accepted:
+            # Ricarica i preset dopo eventuali modifiche
+            self.load_presets()
+
+    def get_current_parameters(self):
+        """Raccoglie tutti i parametri correnti dai widget"""
+        parameters = {}
+        for param_name, widget in self.parameter_widgets.items():
+            # Gestione speciale per il file .blend
+            if param_name == ParamDefinitions.FILE:
+                # Salva con una chiave speciale che non interferisce col comando
+                if isinstance(widget, QWidget):
+                    line_edit = widget.findChild(QLineEdit)
+                    if line_edit and line_edit.text():
+                        parameters['blend_file'] = line_edit.text()
+                continue
+            
+            # Gestione normale per tutti gli altri parametri
+            if isinstance(widget, QCheckBox):
+                parameters[param_name] = widget.isChecked()
+            elif isinstance(widget, QSpinBox):
+                parameters[param_name] = widget.value()
+            elif isinstance(widget, QComboBox):
+                parameters[param_name] = widget.currentText()
+            elif isinstance(widget, QLineEdit):
+                parameters[param_name] = widget.text()
+            elif isinstance(widget, QWidget):
+                # Cerca QLineEdit all'interno di container compositi
+                line_edit = widget.findChild(QLineEdit)
+                if line_edit:
+                    parameters[param_name] = line_edit.text()
+        return parameters

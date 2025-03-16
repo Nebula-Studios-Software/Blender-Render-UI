@@ -1,20 +1,19 @@
 class ParamDefinitions:
     """
-    Definizioni complete dei parametri della linea di comando di Blender 4.0+
-    Organizzati per categoria e con ordine definito
+    Complete definitions of Blender 4.0+ command line parameters
+    Organized by category with defined order
     """
     
-    # Dizionario che mappa i parametri al loro ordine di priorità
+    # Dictionary mapping parameters to their priority order
     PARAM_ORDER = {
-        "-b": 0,            # --background (sempre per primo)
-        "-E": 1,           # --engine (subito dopo il file .blend)
-        "--cycles-device": 2,  # device per cycles
+        "-b": 0,            # --background (always first)
+        "-E": 1,           # --engine (right after the .blend file)
         "-F": 3,           # --render-format
         "-o": 4,           # --render-output
         "-f": 5,           # --render-frame
-        "-e": 5,           # --frame-end (stessa priorità di -f perché non possono coesistere)
+        "-e": 5,           # --frame-end (same priority as -f because they cannot coexist)
         "-s": 6,           # --frame-start
-        "-a": 7,           # --render-anim (sempre dopo i frame parameters)
+        "-a": 7,           # --render-anim (always after frame parameters)
         "-S": 8,           # --scene
         "-j": 9,           # --frame-jump
         "-x": 10,          # --use-extension
@@ -42,7 +41,7 @@ class ParamDefinitions:
         "--debug-cycles": 32
     }
     
-    # Parametri di base
+    # Basic parameters
     BACKGROUND = "-b"
     PYTHON = "-P"
     PYTHON_EXPR = "--python-expr"
@@ -50,44 +49,43 @@ class ParamDefinitions:
     HELP = "--help"
     VERSION = "--version"
     
-    # Parametri di rendering
+    # Rendering parameters
     RENDER = "-a"
     RENDER_FRAME = "-f"
     RENDER_OUTPUT = "-o"
     SCENE = "-S"
     ENGINE = "-E"
     
-    # Parametri per i file
+    # File parameters
     FILE = "--"
     ADDONS = "--addons"
     
-    # Parametri per il formato e la risoluzione
+    # Format and resolution parameters
     FORMAT = "-F"
     USE_EXTENSION = "-x"
-    RESOLUTION_X = "--resolution-x"  # Aggiunto
-    RESOLUTION_Y = "--resolution-y"  # Aggiunto
+    RESOLUTION_X = "--resolution-x"  # Added
+    RESOLUTION_Y = "--resolution-y"  # Added
     RESOLUTION_PERCENTAGE = "--resolution-percentage"
     
-    # Parametri per i frame
+    # Frame parameters
     FRAME_START = "-s"
     FRAME_END = "-e"
     FRAME_JUMP = "-j"
     
-    # Parametri Cycles
-    CYCLES_DEVICE = "--cycles-device"
+    # Cycles parameters
     CYCLES_PRINT_STATS = "--cycles-print-stats"
-    CYCLES_SAMPLES = "--cycles-samples"  # Aggiunto
+    CYCLES_SAMPLES = "--cycles-samples"  # Added
     
-    # Parametri per thread e performance
+    # Thread and performance parameters
     THREADS = "-t"
     
-    # Parametri di vista
+    # View parameters
     WINDOW_BORDER = "-w"
     WINDOW_FULLSCREEN = "-W"
     WINDOW_GEOMETRY = "-p"
     WINDOW_MAXIMIZED = "-M"
     
-    # Parametri di avvio
+    # Startup parameters
     START_CONSOLE = "-con"
     NO_NATIVE_PIXELS = "--no-native-pixels"
     NO_WINDOW_FOCUS = "--no-window-focus"
@@ -95,104 +93,101 @@ class ParamDefinitions:
     DISABLE_AUTOEXEC = "-Y"
     FACTORY_STARTUP = "--factory-startup"
 
-    # Parametri di debug
+    # Debug parameters
     DEBUG = "-d"
     DEBUG_MEMORY = "--debug-memory"
     DEBUG_CYCLES = "--debug-cycles"
     
     @staticmethod
     def get_param_order(param):
-        """Restituisce l'ordine di priorità di un parametro"""
-        return ParamDefinitions.PARAM_ORDER.get(param, 999)  # Parametri sconosciuti alla fine
+        """Returns the priority order of a parameter"""
+        return ParamDefinitions.PARAM_ORDER.get(param, 999)  # Unknown parameters at the end
 
     @staticmethod
     def get_categories():
-        """Restituisce i parametri organizzati per categoria per l'interfaccia utente"""
+        """Returns parameters organized by category for the user interface"""
         return {
             "Base": [
                 {"name": "Background", "param": ParamDefinitions.BACKGROUND, "type": "bool", 
-                 "description": "Esegui Blender in modalità headless (senza interfaccia grafica)"},
+                 "description": "Run Blender in headless mode (without GUI)"},
                 {"name": "Python Script", "param": ParamDefinitions.PYTHON, "type": "file", 
-                 "description": "Esegui uno script Python"},
+                 "description": "Execute a Python script"},
                 {"name": "Python Expression", "param": ParamDefinitions.PYTHON_EXPR, "type": "string", 
-                 "description": "Esegui un'espressione Python"},
+                 "description": "Execute a Python expression"},
                 {"name": "Help", "param": ParamDefinitions.HELP, "type": "bool", 
-                 "description": "Mostra l'help della linea di comando"},
+                 "description": "Show command line help"},
                 {"name": "Version", "param": ParamDefinitions.VERSION, "type": "bool", 
-                 "description": "Mostra la versione di Blender"}
+                 "description": "Show Blender version"}
             ],
             "File": [
                 {"name": "Blend File", "param": ParamDefinitions.FILE, "type": "file", 
-                 "description": "File .blend da aprire"},
+                 "description": "Blend file to open"},
                 {"name": "Addons", "param": ParamDefinitions.ADDONS, "type": "string", 
-                 "description": "Lista di addon da abilitare, separati da virgola"}
+                 "description": "List of addons to enable, comma separated"}
             ],
             "Rendering": [
                 {"name": "Render Animation", "param": ParamDefinitions.RENDER, "type": "bool", 
-                 "description": "Rendi l'animazione completa"},
+                 "description": "Render the complete animation"},
                 {"name": "Render Frame", "param": ParamDefinitions.RENDER_FRAME, "type": "string", 
-                 "description": "Rendi specifici frame (es. '1,3,5-10')"},
+                 "description": "Render specific frames (e.g. '1,3,5-10')"},
                 {"name": "Output Path", "param": ParamDefinitions.RENDER_OUTPUT, "type": "path", 
-                 "description": "Percorso per i file di output"},
+                 "description": "Path for output files"},
                 {"name": "Scene", "param": ParamDefinitions.SCENE, "type": "string", 
-                 "description": "Nome della scena da renderizzare"},
+                 "description": "Scene name to render"},
                 {"name": "Engine", "param": ParamDefinitions.ENGINE, "type": "enum", 
                  "options": ["CYCLES", "BLENDER_EEVEE_NEXT", "BLENDER_WORKBENCH"], 
-                 "description": "Motore di rendering da utilizzare"}
+                 "description": "Render engine to use"}
             ],
             "Format": [
                 {"name": "Format", "param": ParamDefinitions.FORMAT, "type": "enum", 
                  "options": ["PNG", "JPEG", "OPEN_EXR", "TIFF", "WEBP", "FFMPEG"], 
-                 "description": "Formato dei file di output"},
+                 "description": "Output file format"},
                 {"name": "Resolution X", "param": ParamDefinitions.RESOLUTION_X, "type": "int", 
-                 "description": "Larghezza in pixel dell'immagine renderizzata"},
+                 "description": "Rendered image width in pixels"},
                 {"name": "Resolution Y", "param": ParamDefinitions.RESOLUTION_Y, "type": "int", 
-                 "description": "Altezza in pixel dell'immagine renderizzata"},
+                 "description": "Rendered image height in pixels"},
                 {"name": "Resolution %", "param": ParamDefinitions.RESOLUTION_PERCENTAGE, "type": "int", 
-                 "description": "Percentuale della risoluzione (1-100)"}
+                 "description": "Resolution percentage (1-100)"}
             ],
             "Frames": [
                 {"name": "Start Frame", "param": ParamDefinitions.FRAME_START, "type": "int", 
-                 "description": "Frame iniziale dell'animazione"},
+                 "description": "Start frame of animation"},
                 {"name": "End Frame", "param": ParamDefinitions.FRAME_END, "type": "int", 
-                 "description": "Frame finale dell'animazione"},
+                 "description": "End frame of animation"},
                 {"name": "Frame Jump", "param": ParamDefinitions.FRAME_JUMP, "type": "int", 
-                 "description": "Numero di frame da saltare tra i render"}
+                 "description": "Number of frames to skip between renders"}
             ],
             "Cycles": [
-                {"name": "Device", "param": ParamDefinitions.CYCLES_DEVICE, "type": "enum", 
-                 "options": ["CPU", "CUDA", "OPTIX", "HIP", "METAL", "ONEAPI"], 
-                 "description": "Dispositivo di calcolo per Cycles"},
                 {"name": "Samples", "param": ParamDefinitions.CYCLES_SAMPLES, "type": "int", 
-                 "description": "Numero di campioni per il rendering"}
+                 "description": "Number of samples for rendering"}
             ],
             "Performance": [
                 {"name": "Threads", "param": ParamDefinitions.THREADS, "type": "int", 
-                 "description": "Numero di thread per il rendering (0=auto)"}
+                 "description": "Number of threads for rendering (0=auto)"}
             ],
             "Debug": [
                 {"name": "Debug", "param": ParamDefinitions.DEBUG, "type": "bool", 
-                 "description": "Abilita modalità debug"},
+                 "description": "Enable debug mode"},
                 {"name": "Debug Memory", "param": ParamDefinitions.DEBUG_MEMORY, "type": "bool", 
-                 "description": "Mostra informazioni sull'uso della memoria"},
+                 "description": "Show memory usage information"},
                 {"name": "Debug Cycles", "param": ParamDefinitions.DEBUG_CYCLES, "type": "bool", 
-                 "description": "Abilita debug per Cycles"}
+                 "description": "Enable Cycles debug"}
             ],
-            "Avanzate": [
+            "Advanced": [
                 {"name": "Window Geometry", "param": ParamDefinitions.WINDOW_GEOMETRY, "type": "string", 
-                 "description": "Posizione e dimensione finestra (X,Y,W,H)"},
+                 "description": "Window position and size (X,Y,W,H)"},
                 {"name": "Factory Startup", "param": ParamDefinitions.FACTORY_STARTUP, "type": "bool", 
-                 "description": "Usa le impostazioni di fabbrica"},
+                 "description": "Use factory settings"},
                 {"name": "Enable Autoexec", "param": ParamDefinitions.ENABLE_AUTOEXEC, "type": "bool", 
-                 "description": "Abilita auto-esecuzione degli script Python"},
+                 "description": "Enable Python scripts auto-execution"},
                 {"name": "Disable Autoexec", "param": ParamDefinitions.DISABLE_AUTOEXEC, "type": "bool", 
-                 "description": "Disabilita auto-esecuzione degli script Python"}
+                 "description": "Disable Python scripts auto-execution"}
             ]
         }
         
     @staticmethod
     def get_all_parameters():
-        """Restituisce una lista piatta di tutti i parametri disponibili"""
+        """Returns a flat list of all available parameters"""
         all_params = []
         for category in ParamDefinitions.get_categories().values():
             for param in category:
