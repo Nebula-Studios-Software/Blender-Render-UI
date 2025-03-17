@@ -65,7 +65,3 @@ You can find the preset file in your %appdata% folder (Roaming). Search for the 
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request for any enhancements or bug fixes.
-
-## License
-
-This project is licensed under the MIT License. See the LICENSE file for more details.
