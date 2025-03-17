@@ -4,6 +4,11 @@ Built with ❤️ by Nebula Studios Software
 
 This project provides a user-friendly interface for rendering Blender files using command line arguments. The application allows users to construct Blender command line commands through a graphical user interface (GUI) and monitor the rendering process with real-time feedback.
 
+## Important Note
+
+**The application is not yet signed, so you may get a warning from your antivirus software and Windows SmartScreen. You can safely ignore these warnings and run the application.**
+Please understand that signing the application costs a lot of money, and it is not feasible for us at the moment.
+
 ## Features
 
 - **Command Line Argument Builder**: Users can easily build and customize Blender command line arguments using the UI.
