@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QProgressBar, QLabel, QGroupBox, QHBoxLayout, QGridLayout
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QTimer
 from ..utils.settings_manager import SettingsManager
 import time
 import re
@@ -23,6 +23,8 @@ class ProgressMonitor(QGroupBox):
         super().__init__("Rendering Progress")
         self.settings_manager = SettingsManager()
         self.current_frame = 0
+        self.start_frame = 1
+        self.end_frame = 1
         self.total_frames = 0
         self.current_sample = 0
         self.total_samples = 0
@@ -31,6 +33,8 @@ class ProgressMonitor(QGroupBox):
         self.current_memory = ""
         self.peak_memory = ""
         self.using_cycles = False  # Flag to indicate if we are using Cycles
+        self.render_start_time = None
+        self.blender_executor = None  # Will be set by MainWindow
         
         # Load saved settings
         saved_settings = self.settings_manager.get_setting('progress_monitor', {})
@@ -67,84 +71,59 @@ class ProgressMonitor(QGroupBox):
         layout = QVBoxLayout()
         layout.setSpacing(10)
         layout.setContentsMargins(10, 15, 10, 10)
+
+        # Info section
+        info_layout = QHBoxLayout()
         
-        # Top Info Container with Grid Layout to align information
-        top_info_container = QWidget()
-        top_info_layout = QGridLayout(top_info_container)
-        top_info_layout.setContentsMargins(0, 0, 0, 0)
-        top_info_layout.setSpacing(20)
-        
-        # Frame Counter
         self.frame_label = QLabel("Frame: 0/0")
-        self.frame_label.setStyleSheet("""
-            QLabel {
-                color: #eb5e28;
-                font-size: 11pt;
-                font-weight: bold;
-            }
-        """)
-        top_info_layout.addWidget(self.frame_label, 0, 0)
+        self.frame_label.setStyleSheet("color: #eb5e28; font-weight: bold;")
+        info_layout.addWidget(self.frame_label)
         
-        # Memory Usage
         self.memory_label = QLabel("Memory: 0MB (Peak: 0MB)")
-        self.memory_label.setStyleSheet("""
-            QLabel {
-                color: #e0e0e0;
-                font-size: 10pt;
-            }
-        """)
-        top_info_layout.addWidget(self.memory_label, 0, 1)
+        self.memory_label.setStyleSheet("color: #e0e0e0;")
+        info_layout.addWidget(self.memory_label)
         
-        # Time Info
         self.time_label = QLabel("Time: 00:00:00")
-        self.time_label.setStyleSheet("""
-            QLabel {
-                color: #e0e0e0;
-                font-size: 10pt;
-            }
-        """)
-        top_info_layout.addWidget(self.time_label, 0, 2)
+        self.time_label.setStyleSheet("color: #e0e0e0;")
+        info_layout.addWidget(self.time_label)
         
-        # Status and Scene Info
-        self.status_container = QWidget()
-        status_layout = QHBoxLayout(self.status_container)
-        status_layout.setContentsMargins(0, 0, 0, 0)
-        status_layout.setSpacing(10)
+        info_layout.addStretch()
+        layout.addLayout(info_layout)
+
+        # Status section
+        status_layout = QHBoxLayout()
         
         self.status_label = QLabel("Waiting...")
-        self.status_label.setStyleSheet("""
-            QLabel {
-                color: #eb5e28;
-                font-size: 10pt;
-            }
-        """)
+        self.status_label.setStyleSheet("color: #eb5e28;")
         status_layout.addWidget(self.status_label)
         
         self.scene_label = QLabel("")
-        self.scene_label.setStyleSheet("""
-            QLabel {
-                color: #e0e0e0;
-                font-size: 10pt;
-            }
-        """)
+        self.scene_label.setStyleSheet("color: #e0e0e0;")
         status_layout.addWidget(self.scene_label)
+        
         status_layout.addStretch()
-        
-        layout.addWidget(top_info_container)
-        layout.addWidget(self.status_container)
-        
-        # Main Progress Bar for total progress
+        layout.addLayout(status_layout)
+
+        # Progress bars section
+        progress_section = QVBoxLayout()
+        progress_section.setSpacing(10)
+
+        # Frame Progress
+        frame_label = QLabel("Frame Progress")
+        frame_label.setStyleSheet("color: #e0e0e0; font-weight: bold;")
+        progress_section.addWidget(frame_label)
+
         self.progress_bar = QProgressBar()
-        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setFormat("%v%")
+        self.progress_bar.setMinimumHeight(20)
         self.progress_bar.setStyleSheet("""
             QProgressBar {
                 border: 2px solid #3d3d3d;
                 border-radius: 6px;
                 background-color: #2d2d2d;
-                height: 12px;
                 text-align: center;
+                font-size: 9pt;
             }
-            
             QProgressBar::chunk {
                 background-color: qlineargradient(
                     x1:0, y1:0, x2:1, y2:0,
@@ -154,34 +133,63 @@ class ProgressMonitor(QGroupBox):
                 border-radius: 4px;
             }
         """)
-        layout.addWidget(self.progress_bar)
-        
-        # Sample Progress Bar - initially hidden
+        progress_section.addWidget(self.progress_bar)
+
+        # Sample Progress
+        self.sample_label = QLabel("Sample Progress")
+        self.sample_label.setStyleSheet("color: #e0e0e0; font-weight: bold;")
+        progress_section.addWidget(self.sample_label)
+
         self.sample_progress = QProgressBar()
-        self.sample_progress.setTextVisible(True)
         self.sample_progress.setFormat("Sample %v/%m")
-        self.sample_progress.setVisible(False)  # Hidden by default
+        self.sample_progress.setMinimum(0)
+        self.sample_progress.setMaximum(1)  # Inizializziamo a 1 per evitare divisione per zero
+        self.sample_progress.setMinimumHeight(20)
         self.sample_progress.setStyleSheet("""
             QProgressBar {
                 border: 2px solid #3d3d3d;
                 border-radius: 6px;
                 background-color: #2d2d2d;
-                height: 8px;
                 text-align: center;
-                color: #e0e0e0;
                 font-size: 9pt;
             }
-            
             QProgressBar::chunk {
                 background-color: #eb5e28;
-                border-radius: 3px;
+                border-radius: 4px;
             }
         """)
-        layout.addWidget(self.sample_progress)
-        
+        progress_section.addWidget(self.sample_progress)
+
+        layout.addLayout(progress_section)
         self.setLayout(layout)
-        self.reset()
-    
+        
+        # Initialize visibility
+        self.sample_label.hide()
+        self.sample_progress.hide()
+
+    def reset(self):
+        """Resets the progress monitor for a new render"""
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("Frame %v%")
+        self.sample_progress.setValue(0)
+        self.sample_progress.setMaximum(1)  # Reset to 1 invece che 100
+        self.sample_progress.setFormat("Sample %v/%m")
+        self.frame_label.setText("Frame: 0/0")
+        self.memory_label.setText("Memory: 0MB (Peak: 0MB)")
+        self.time_label.setText("Time: 00:00:00")
+        self.status_label.setText("Waiting...")
+        self.scene_label.setText("")
+        self.current_frame = 0
+        self.total_frames = 0
+        self.current_sample = 0
+        self.total_samples = 0
+        self.in_compositing = False
+        self.using_cycles = False
+        self.render_start_time = None
+        # Hide sample section
+        self.sample_label.hide()
+        self.sample_progress.hide()
+
     @pyqtSlot(int, int)
     def update_progress(self, current_frame, total_frames):
         """Update the progress bar and frame information"""
@@ -212,35 +220,85 @@ class ProgressMonitor(QGroupBox):
         self.progress_bar.setValue(100)
         self.sample_progress.setValue(100)
     
-    def reset(self):
-        """Resets the progress monitor for a new render"""
-        self.progress_bar.setValue(0)
-        self.sample_progress.setValue(0)
-        self.sample_progress.setVisible(False)
-        self.frame_label.setText("Frame: 0/0")
-        self.memory_label.setText("Memory: 0MB (Peak: 0MB)")
-        self.time_label.setText("Time: 00:00:00")
-        self.status_label.setText("Waiting...")
-        self.scene_label.setText("")
-        self.current_frame = 0
-        self.total_frames = 0
-        self.current_sample = 0
-        self.total_samples = 0
-        self.in_compositing = False
-        self.using_cycles = False
+    def start_render(self):
+        """Called when rendering starts"""
+        self.render_start_time = time.time()
+        self.update_elapsed_time()
+
+    def set_blender_executor(self, executor):
+        """Sets the BlenderExecutor reference"""
+        self.blender_executor = executor
+
+    def update_elapsed_time(self):
+        """Updates the elapsed time display"""
+        if self.render_start_time is None:
+            return
+        
+        elapsed = int(time.time() - self.render_start_time)
+        hours = elapsed // 3600
+        minutes = (elapsed % 3600) // 60
+        seconds = elapsed % 60
+        self.time_label.setText(f"Time: {hours:02d}:{minutes:02d}:{seconds:02d}")
+        
+        # Continue updating while rendering
+        if self.blender_executor and self.blender_executor.is_running:
+            QTimer.singleShot(1000, self.update_elapsed_time)
     
     def parse_blender_output(self, line):
         """Parses a line of Blender output to extract progress information"""
-        # Extracts the current frame
+        # Start timing on first frame
+        if self.render_start_time is None and "Fra:" in line:
+            self.start_render()
+
+        # Handle sample progress first (since it's the most specific)
+        sample_match = re.search(r'Sample (\d+)/(\d+)', line)
+        if sample_match:
+            try:
+                current_sample = int(sample_match.group(1))
+                total_samples = int(sample_match.group(2))
+                
+                # Se è il primo sample che troviamo, mostriamo la progress bar
+                if not self.using_cycles:
+                    self.using_cycles = True
+                    self.sample_label.show()
+                    self.sample_progress.show()
+                    self.sample_progress.setMaximum(total_samples)
+                
+                # Aggiorna il valore corrente
+                self.sample_progress.setValue(current_sample)
+                self.current_sample = current_sample
+                self.total_samples = total_samples
+                
+                # Forza l'aggiornamento del testo
+                self.sample_progress.setFormat(f"Sample {current_sample}/{total_samples}")
+                self.status_label.setText(f"Rendering sample {current_sample}/{total_samples}")
+            except (ValueError, IndexError) as e:
+                print(f"Error parsing sample numbers: {e}")
+                return
+
+        # Handle frame progress
         frame_match = re.search(r'Fra:(\d+)', line)
         if frame_match:
             self.current_frame = int(frame_match.group(1))
+            self.frame_label.setText(f"Frame: {self.current_frame}/{self.end_frame}")
             if self.total_frames > 0:
-                self.frame_label.setText(f"Frame: {self.current_frame}/{self.total_frames}")
-                progress = int((self.current_frame / self.total_frames) * 100)
+                progress = int(((self.current_frame - self.start_frame + 1) / self.total_frames) * 100)
+                progress = max(0, min(100, progress))
                 self.progress_bar.setValue(progress)
-        
-        # Extracts memory information
+                self.progress_bar.setFormat(f"{progress}%")
+
+        # Handle compositing separately
+        if "Compositing" in line and "Sample" not in line:
+            self.in_compositing = True
+            if "|" in line:
+                comp_match = re.search(r'Compositing \| (.*?)(?=\||$)', line)
+                if comp_match:
+                    self.compositing_operation = comp_match.group(1).strip()
+                    self.status_label.setText(f"Compositing: {self.compositing_operation}")
+            else:
+                self.status_label.setText("Compositing")
+                
+        # Handle memory info
         mem_match = re.search(r'Mem:([\d.]+)([MG]).*Peak\s+([\d.]+)([MG])', line)
         if mem_match:
             current = float(mem_match.group(1))
@@ -248,71 +306,33 @@ class ProgressMonitor(QGroupBox):
             peak = float(mem_match.group(3))
             peak_unit = mem_match.group(4)
             
-            # Convert to MB if necessary
             if current_unit == 'G':
                 current *= 1024
             if peak_unit == 'G':
                 peak *= 1024
             
             self.memory_label.setText(f"Memory: {current:.2f}MB (Peak: {peak:.2f}MB)")
-        
-        # Extracts rendering time
-        time_match = re.search(r'Time:([\d:.]+)', line)
-        if time_match:
-            render_time = time_match.group(1)
-            self.time_label.setText(f"Time: {render_time}")
-        
-        # Handles compositing
-        if "Compositing" in line:
-            self.in_compositing = True
-            self.status_label.setText("Compositing")
-            
-            # Resets sample progress when compositing starts
-            if self.using_cycles:
-                self.sample_progress.setValue(0)
-            
-            # Extracts compositing operation
-            comp_match = re.search(r'Compositing \| (.*?)(?=\||$)', line)
-            if comp_match:
-                comp_status = comp_match.group(1).strip()
-                if self.using_cycles:
-                    self.sample_progress.setFormat(f"Compositing: {comp_status}")
-                self.status_label.setText(f"Compositing: {comp_status}")
-            elif "Initializing" in line:
-                if self.using_cycles:
-                    self.sample_progress.setFormat("Initializing compositing...")
-                self.status_label.setText("Initializing compositing...")
-        
-        # Handles samples in rendering (only for Cycles)
-        elif "Sample" in line and not self.in_compositing:
-            sample_match = re.search(r'Sample (\d+)/(\d+)', line)
-            if sample_match:
-                self.using_cycles = True
-                self.sample_progress.setVisible(True)
-                self.current_sample = int(sample_match.group(1))
-                self.total_samples = int(sample_match.group(2))
-                self.sample_progress.setMaximum(self.total_samples)
-                self.sample_progress.setValue(self.current_sample)
-                self.sample_progress.setFormat(f"Sample %v/%m")
-                self.status_label.setText(f"Rendering sample {self.current_sample}/{self.total_samples}")
-        
-        # Extracts scene and viewlayer name
+
+        # Handle scene info
         scene_match = re.search(r'\| ([^|]+), ([^|]+) \|', line)
         if scene_match:
             scene = scene_match.group(1).strip()
             viewlayer = scene_match.group(2).strip()
             self.scene_label.setText(f"{scene} - {viewlayer}")
-        
-        # Detects frame or compositing completion
+
+        # Handle render completion
         if "Finished" in line:
-            self.in_compositing = False  # Reset compositing state
             if self.using_cycles:
                 self.sample_progress.setValue(self.total_samples)
             self.status_label.setText("Frame completed")
-    
+
     def set_total_frames(self, start_frame, end_frame):
         """Sets the total number of frames to render"""
         if end_frame >= start_frame:
+            self.start_frame = start_frame
+            self.end_frame = end_frame
             self.total_frames = end_frame - start_frame + 1
-            self.frame_label.setText(f"Frame: 0/{self.total_frames}")
-            self.progress_bar.setRange(0, 100)  # Total percentage
+            self.progress_bar.setRange(0, 100)
+            # Initialize with start frame
+            self.frame_label.setText(f"Frame: {start_frame}/{end_frame}")
+            self.progress_bar.setValue(0)

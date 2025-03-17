@@ -10,11 +10,11 @@ class ParamDefinitions:
         "-E": 1,           # --engine (right after the .blend file)
         "-F": 3,           # --render-format
         "-o": 4,           # --render-output
-        "-f": 5,           # --render-frame
-        "-e": 5,           # --frame-end (same priority as -f because they cannot coexist)
-        "-s": 6,           # --frame-start
-        "-a": 7,           # --render-anim (always after frame parameters)
-        "-S": 8,           # --scene
+        "-S": 5,           # --scene
+        "-f": 6,           # --render-frame
+        "-s": 6,           # --frame-start (same priority as -f because they cannot coexist)
+        "-e": 7,           # --frame-end
+        "-a": 8,           # --render-anim (always after frame parameters)
         "-j": 9,           # --frame-jump
         "-x": 10,          # --use-extension
         "-w": 11,          # --window-border

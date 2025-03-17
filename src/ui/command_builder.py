@@ -48,25 +48,26 @@ class CommandBuilder(QWidget):
         main_layout.setSpacing(0)
         main_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Tab widget con stile moderno e orientamento verticale
+        # Tab widget con stile moderno
         tabs = QTabWidget()
         tabs.setDocumentMode(True)
         tabs.setTabPosition(QTabWidget.West)  # Tab verticali a sinistra
         
-        # Stile moderno per i tab
+        # Stile moderno per i tab con testo ruotato
         tabs.setStyleSheet("""
             QTabWidget::pane {
                 border: none;
                 background: #1e1e1e;
             }
             QTabBar::tab {
-                padding: 15px;
+                padding: 8px;
                 color: #e0e0e0;
                 background: #252525;
                 border: none;
                 border-right: 2px solid #1e1e1e;
-                min-width: 120px;
-                max-width: 120px;
+                min-width: 35px;
+                max-width: 35px;
+                min-height: 120px;
             }
             QTabBar::tab:selected {
                 background: #1e1e1e;
@@ -192,11 +193,29 @@ class CommandBuilder(QWidget):
             
             scroll_content = QWidget()
             scroll_layout = QFormLayout(scroll_content)
-            scroll_layout.setSpacing(15)
-            scroll_layout.setContentsMargins(0, 0, 15, 0)
+            scroll_layout.setSpacing(10)  # Ridotto lo spacing
+            scroll_layout.setContentsMargins(15, 10, 15, 10)  # Margini più compatti
+            scroll_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)  # Allinea le etichette a destra
+            scroll_layout.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
             
             for param in parameters:
-                self.add_parameter_widget(param, scroll_layout)
+                # Aggiungi la label con i due punti ma in una riga separata
+                label = QLabel(param["name"])
+                label.setStyleSheet("color: #eb5e28; font-weight: bold;")
+                label.setWordWrap(True)  # Permette il wrapping del testo
+                scroll_layout.addRow(label)
+                
+                # Aggiungi il widget del parametro nella riga successiva
+                widget = self.create_parameter_widget(param)
+                if widget:
+                    widget.setToolTip(param["description"])
+                    self.parameter_widgets[param["param"]] = widget
+                    scroll_layout.addRow(widget)
+                
+                # Aggiungi un po' di spazio dopo ogni parametro
+                spacer = QWidget()
+                spacer.setFixedHeight(5)
+                scroll_layout.addRow(spacer)
             
             scroll_content.setLayout(scroll_layout)
             scroll.setWidget(scroll_content)
@@ -626,3 +645,80 @@ class CommandBuilder(QWidget):
                 if line_edit:
                     parameters[param_name] = line_edit.text()
         return parameters
+
+    def create_parameter_widget(self, param):
+        """Crea il widget appropriato per il tipo di parametro"""
+        param_type = param["type"]
+        param_description = param["description"]
+        
+        if param_type == "bool":
+            widget = QCheckBox()
+            widget.stateChanged.connect(lambda state, p=param["param"]: 
+                                    self.update_parameter(p, state == Qt.Checked))
+            return widget
+        
+        elif param_type == "file":
+            container = QWidget()
+            file_layout = QHBoxLayout(container)
+            file_layout.setContentsMargins(0, 0, 0, 0)
+            file_layout.setSpacing(5)
+            
+            line_edit = QLineEdit()
+            line_edit.setPlaceholderText(param_description)
+            
+            browse_button = QPushButton("...")
+            browse_button.setFixedWidth(45)
+            browse_button.clicked.connect(lambda _, le=line_edit, p=param["param"]: 
+                                        self.browse_file(le, p))
+            
+            file_layout.addWidget(line_edit)
+            file_layout.addWidget(browse_button)
+            
+            line_edit.textChanged.connect(lambda text, p=param["param"]: 
+                                        self.update_parameter(p, text))
+            return container
+        
+        elif param_type == "path":
+            container = QWidget()
+            path_layout = QHBoxLayout(container)
+            path_layout.setContentsMargins(0, 0, 0, 0)
+            path_layout.setSpacing(5)
+            
+            line_edit = QLineEdit()
+            line_edit.setPlaceholderText(param_description)
+            
+            browse_button = QPushButton("...")
+            browse_button.setFixedWidth(45)
+            browse_button.clicked.connect(lambda _, le=line_edit, p=param["param"]: 
+                                        self.browse_directory(le, p))
+            
+            path_layout.addWidget(line_edit)
+            path_layout.addWidget(browse_button)
+            
+            line_edit.textChanged.connect(lambda text, p=param["param"]: 
+                                        self.update_parameter(p, text))
+            return container
+        
+        elif param_type == "string":
+            widget = QLineEdit()
+            widget.setPlaceholderText(param_description)
+            widget.textChanged.connect(lambda text, p=param["param"]: 
+                                    self.update_parameter(p, text))
+            return widget
+        
+        elif param_type == "int":
+            widget = QSpinBox()
+            widget.setRange(-999999, 999999)
+            widget.valueChanged.connect(lambda value, p=param["param"]: 
+                                    self.update_parameter(p, value))
+            return widget
+        
+        elif param_type == "enum" and "options" in param:
+            widget = QComboBox()
+            for option in param["options"]:
+                widget.addItem(option)
+            widget.currentTextChanged.connect(lambda text, p=param["param"]: 
+                                        self.update_parameter(p, text))
+            return widget
+        
+        return None

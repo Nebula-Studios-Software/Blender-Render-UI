@@ -4,6 +4,7 @@ from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QIcon
 import os
 import sys
+import subprocess
 from .styles import STYLE  # Aggiunto import di STYLE
 
 from src.ui.command_builder import CommandBuilder
@@ -42,10 +43,10 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1200, 800)
         
         # Create status bar
-        self.statusBar().setFixedHeight(28)
+        self.statusBar().setFixedHeight(40)
         
         # App info
-        app_info = QLabel("Blender Render UI v0.1.0 | By Nebula Studios")
+        app_info = QLabel("Blender Render UI | By Nebula Studios")
         self.statusBar().addPermanentWidget(app_info)
         
         # Separator
@@ -81,7 +82,7 @@ class MainWindow(QMainWindow):
                 background-color: #eb5e28;
             }
             QSplitter::handle:pressed {
-                background-color: #0096b4;
+                background-color: #eb5e28;
             }
         """)
 
@@ -216,8 +217,33 @@ class MainWindow(QMainWindow):
         """)
         self.stop_button.clicked.connect(self.stop_render)
         
+        self.open_output_button = QPushButton("Open Output Folder")
+        self.open_output_button.setFixedHeight(40)
+        self.open_output_button.setEnabled(False)
+        self.open_output_button.setStyleSheet("""
+            QPushButton {
+                background-color: #1a1918;
+                color: #eb5e28;
+                border: 2px solid #eb5e28;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #eb5e28;
+                color: #fffcf2;
+            }
+            QPushButton:disabled {
+                background-color: #1a1918;
+                border-color: #666666;
+                color: #666666;
+            }
+        """)
+        self.open_output_button.clicked.connect(self.open_output_directory)
+        
         render_buttons_layout.addWidget(self.render_button)
         render_buttons_layout.addWidget(self.stop_button)
+        render_buttons_layout.addWidget(self.open_output_button)
         render_buttons_layout.addStretch()
         
         top_layout.addWidget(preview_label)
@@ -228,6 +254,11 @@ class MainWindow(QMainWindow):
         # Progress Monitor e Log Viewer
         self.progress_monitor = ProgressMonitor()
         self.log_viewer = LogViewer()
+        
+        # Initialize BlenderExecutor and connect signals
+        self.blender_executor = BlenderExecutor()
+        self.progress_monitor.set_blender_executor(self.blender_executor)  # Pass the reference
+        self.connect_signals()
         
         right_layout.addWidget(top_frame)
         right_layout.addWidget(self.progress_monitor)
@@ -263,10 +294,6 @@ class MainWindow(QMainWindow):
         
         main_layout.addWidget(splitter)
         central_widget.setLayout(main_layout)
-        
-        # Initialize BlenderExecutor and connect signals
-        self.blender_executor = BlenderExecutor()
-        self.connect_signals()
         
         self.center_window()
     
@@ -304,6 +331,7 @@ class MainWindow(QMainWindow):
         """Handles the render completion event"""
         self.render_button.setEnabled(True)
         self.stop_button.setEnabled(False)
+        self.open_output_button.setEnabled(True)  # Enable the output button
         
         log_level = "INFO" if success else "ERROR"
         self.log_viewer.append_log(message, log_level)
@@ -338,29 +366,55 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Error", "Invalid command or Blender path not specified")
             return
         
-        # Extract frame start and end values from parameters if available
+        # Extract frame start and end values from parameters
         start_frame = 1
         end_frame = 1
         
-        # Search for frame parameters in the command
+        # First check for animation render
+        is_animation = False
         for i, arg in enumerate(command):
-            if (arg == ParamDefinitions.FRAME_START and i + 1 < len(command)):
-                try:
-                    start_frame = int(command[i + 1])
-                except ValueError:
-                    pass
-            elif (arg == ParamDefinitions.FRAME_END and i + 1 < len(command)):
-                try:
-                    end_frame = int(command[i + 1])
-                except ValueError:
-                    pass
+            if arg == ParamDefinitions.RENDER:
+                is_animation = True
+                break
         
-        # Set total number of frames in progress monitor
-        self.progress_monitor.set_total_frames(start_frame, end_frame)
+        # If animation, look for start/end frames
+        if is_animation:
+            for i, arg in enumerate(command):
+                if (arg == ParamDefinitions.FRAME_START and i + 1 < len(command)):
+                    try:
+                        start_frame = int(command[i + 1])
+                    except ValueError:
+                        pass
+                elif (arg == ParamDefinitions.FRAME_END and i + 1 < len(command)):
+                    try:
+                        end_frame = int(command[i + 1])
+                    except ValueError:
+                        pass
+        # If not animation, check for single frame
+        else:
+            for i, arg in enumerate(command):
+                if (arg == ParamDefinitions.RENDER_FRAME and i + 1 < len(command)):
+                    try:
+                        frame_value = command[i + 1]
+                        # Handle range notation (e.g., "1-10")
+                        if "-" in frame_value:
+                            parts = frame_value.split("-")
+                            if len(parts) == 2:
+                                start_frame = int(parts[0])
+                                end_frame = int(parts[1])
+                        else:
+                            # Single frame
+                            start_frame = int(frame_value)
+                            end_frame = start_frame
+                    except ValueError:
+                        pass
         
         # Reset log and monitor
         self.log_viewer.append_log("Preparing rendering...", "INFO")
         self.progress_monitor.reset()
+        
+        # Set total frames in progress monitor
+        self.progress_monitor.set_total_frames(start_frame, end_frame)
         
         # Execute Blender command
         success = self.blender_executor.execute(command, start_frame, end_frame)
@@ -420,3 +474,26 @@ class MainWindow(QMainWindow):
         self.command_preview.clear()
         # Reset the command builder
         self.command_builder.load_saved_settings()
+
+    def open_output_directory(self):
+        """Opens the output directory in file explorer"""
+        # Get the output path from the command builder
+        output_path = None
+        for param_name, widget in self.command_builder.parameter_widgets.items():
+            if param_name == ParamDefinitions.RENDER_OUTPUT:
+                if isinstance(widget, QWidget):
+                    line_edit = widget.findChild(QLineEdit)
+                    if line_edit:
+                        output_path = os.path.dirname(line_edit.text())
+                        break
+
+        if output_path and os.path.exists(output_path):
+            # Use the default system file explorer to open the directory
+            if sys.platform == "win32":
+                os.startfile(output_path)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", output_path])
+            else:
+                subprocess.Popen(["xdg-open", output_path])
+        else:
+            QMessageBox.warning(self, "Error", "Output directory not found or not specified")

@@ -136,8 +136,9 @@ class BlenderExecutor(QObject):
             total_frames = self.end_frame - self.start_frame + 1
             
             if total_frames > 0:
-                # Calculate and emit progress
-                progress = (current_frame - self.start_frame) / total_frames
+                # Calculate actual progress considering start frame
+                current_progress = current_frame - self.start_frame + 1
+                progress = current_progress / total_frames
                 progress = max(0.0, min(1.0, progress))  # Clamp between 0 and 1
                 self.render_progress.emit(progress)
 
