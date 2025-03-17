@@ -12,6 +12,7 @@ from src.ui.progress_monitor import ProgressMonitor
 from src.ui.log_viewer import LogViewer
 from src.core.blender_executor import BlenderExecutor
 from src.core.param_definitions import ParamDefinitions
+from src.utils.update_checker import UpdateChecker
 
 def get_resource_path(relative_path):
     """Get the absolute path to a resource, works for dev and for PyInstaller"""
@@ -37,6 +38,8 @@ class MainWindow(QMainWindow):
                 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
         
         self.init_ui()
+        # Controllo automatico aggiornamenti all'avvio
+        self.check_for_updates(silent=True)
 
     def init_ui(self):
         self.setWindowTitle("Blender Render UI")
@@ -53,6 +56,27 @@ class MainWindow(QMainWindow):
         separator = QLabel("|")
         separator.setStyleSheet("color: #2a2826;")
         self.statusBar().addPermanentWidget(separator)
+        
+        # Check for updates button
+        self.update_button = QPushButton("Check Updates")
+        self.update_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #eb5e28;
+                border: none;
+                padding: 5px 10px;
+            }
+            QPushButton:hover {
+                color: #ff7f50;
+            }
+        """)
+        self.update_button.clicked.connect(lambda: self.check_for_updates(silent=False))
+        self.statusBar().addPermanentWidget(self.update_button)
+        
+        # Another separator
+        separator2 = QLabel("|")
+        separator2.setStyleSheet("color: #2a2826;")
+        self.statusBar().addPermanentWidget(separator2)
         
         # Status indicator
         self.status_indicator = QLabel("⬤ Waiting")
@@ -497,3 +521,28 @@ class MainWindow(QMainWindow):
                 subprocess.Popen(["xdg-open", output_path])
         else:
             QMessageBox.warning(self, "Error", "Output directory not found or not specified")
+
+    def check_for_updates(self, silent=False):
+        """Controlla la disponibilità di aggiornamenti"""
+        update_available, latest_version, download_url = UpdateChecker.check_for_updates()
+        
+        if update_available and latest_version and download_url:
+            reply = QMessageBox.question(
+                self,
+                "Update Available",
+                f"A new version ({latest_version}) is available!\n\n"
+                f"Would you like to download it?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            
+            if reply == QMessageBox.Yes:
+                import webbrowser
+                webbrowser.open(download_url)
+        elif not silent:
+            QMessageBox.information(
+                self,
+                "No Updates",
+                "You are using the latest version.",
+                QMessageBox.Ok
+            )

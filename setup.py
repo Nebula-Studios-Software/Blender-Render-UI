@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='blender-render-ui',
-    version='0.1.0',
+    version='0.2.0',
     author='Nebula Studios',
     packages=find_packages(where='src'),
     package_dir={'': 'src'},
